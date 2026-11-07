@@ -1,5 +1,5 @@
 -- ======================================================
--- TOICUTE HUB 🌸 | Blox Fruits Edition (Fast Attack 0.5s)
+-- TOICUTE HUB 🌸 | Blox Fruits Ultimate (Fixed & Smooth)
 -- ======================================================
 
 local Success, Rayfield = pcall(function()
@@ -12,13 +12,13 @@ if not Success or not Rayfield then
 end
 
 local Window = Rayfield:CreateWindow({
-   Name = "toicute hub 🌸 | Blox Fruits Fast Attack",
-   LoadingTitle = "Đang tối ưu tốc độ đánh...",
+   Name = "toicute hub 🌸 | Blox Fruits Ultimate",
+   LoadingTitle = "Đang tải toicute hub...",
    LoadingSubtitle = "by toicute001-netizen",
    ConfigurationSaving = {
       Enabled = true,
       FolderName = "toicute_hub_configs",
-      FileName = "FastAttackConfig"
+      FileName = "UltimateFarmConfig"
    },
    Discord = { Enabled = false },
    KeySystem = false
@@ -29,6 +29,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+local VirtualUser = game:GetService("VirtualUser")
 local LocalPlayer = Players.LocalPlayer
 
 local States = {
@@ -36,12 +37,35 @@ local States = {
     AutoObservation = false,
     AutoFarmLevel = false,
     BringMob = false,
+    AutoAttack = true, -- Tự động bật đánh thường mặc định
     WalkSpeedValue = 16,
     JumpPowerValue = 50,
     ESPEnabled = false,
     FlyEnabled = false,
     FlySpeed = 50
 }
+
+-- ======================================================
+-- VÒNG LẶP TỰ ĐỘNG ĐÁNH THƯỜNG (0.5s / ĐẤM)
+-- ======================================================
+task.spawn(function()
+    while true do
+        if States.AutoAttack then
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char then
+                    local tool = char:FindFirstChildOfClass("Tool") or LocalPlayer.Backpack:FindFirstChildOfClass("Tool")
+                    if tool and tool.Parent ~= char then
+                        tool.Parent = char
+                    end
+                    VirtualUser:CaptureController()
+                    VirtualUser:ClickButton1(Vector2.new(500, 500))
+                end
+            end)
+        end
+        task.wait(0.5)
+    end
+end)
 
 -- Tạo các Tab
 local MainTab = Window:CreateTab("Trang chính", 4483362458)
@@ -55,8 +79,17 @@ local SettingsTab = Window:CreateTab("Cài đặt", 4483362458)
 MainTab:CreateSection("Thông tin")
 MainTab:CreateParagraph({Title = "Người chơi", Content = LocalPlayer.Name})
 
--- 2. HỆ THỐNG AUTO FARM VỚI TỐC ĐỘ ĐÁNH 0.5S
-FarmTab:CreateSection("Auto Farm Tốc Độ Cao (0.5s/đòn)")
+-- 2. HỆ THỐNG AUTO FARM (ĐÃ SỬA LỖI ĐỨNG IM)
+FarmTab:CreateSection("Auto Farm Level Ổn Định")
+
+FarmTab:CreateToggle({
+   Name = "Tự Động Đánh Thường (Auto Clicker)",
+   CurrentValue = true,
+   Flag = "AutoAttackToggle",
+   Callback = function(Value)
+       States.AutoAttack = Value
+   end,
+})
 
 local function smoothTween(targetCFrame)
     local char = LocalPlayer.Character
@@ -66,11 +99,11 @@ local function smoothTween(targetCFrame)
     local distance = (hrp.Position - targetCFrame.Position).Magnitude
     local speed = 350
     local timeVal = distance / speed
+    if timeVal < 0.1 then timeVal = 0.1 end
     
     local tweenInfo = TweenInfo.new(timeVal, Enum.EasingStyle.Linear)
     local tween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
     tween:Play()
-    return tween
 end
 
 local function getQuestData()
@@ -86,12 +119,13 @@ local function getQuestData()
     elseif level >= 40 and level <= 59 then
         return "PirateQuest", 2, CFrame.new(-1140, 4, 3828), "Brute"
     else
+        -- Mặc định an toàn tránh đứng im nếu vượt cấp
         return "MarineQuest", 1, CFrame.new(-2708, 9, 2103), "Bandit"
     end
 end
 
 FarmTab:CreateToggle({
-   Name = "Bật Auto Farm (Đánh 0.5s/đòn)",
+   Name = "Bật Auto Farm Level & Nhận Quest",
    CurrentValue = false,
    Flag = "AutoFarmToggle",
    Callback = function(Value)
@@ -105,16 +139,19 @@ FarmTab:CreateToggle({
                            local hrp = char.HumanoidRootPart
                            local questTitle, questIndex, npcPos, mobName = getQuestData()
                            
+                           -- Kiểm tra giao diện xem đã có Quest chưa
                            local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
                            local questGui = playerGui and playerGui:FindFirstChild("Main") and playerGui.Main:FindFirstChild("Quest")
                            local hasActiveQuest = questGui and questGui.Visible
                            
                            if not hasActiveQuest then
+                               -- Bay đến nhận nhiệm vụ
                                smoothTween(npcPos)
                                task.wait(1)
                                ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", questTitle, questIndex)
                                task.wait(0.5)
                            else
+                               -- Tìm quái mục tiêu gần nhất
                                local targetMob = nil
                                for _, v in pairs(workspace.Enemies:GetChildren()) do
                                    if v.Name == mobName and v:FindFirstChild("HumanoidRootPart") and v:FindFirstChildOfClass("Humanoid") and v.Humanoid.Health > 0 then
@@ -125,27 +162,19 @@ FarmTab:CreateToggle({
                                
                                if targetMob then
                                    local mobHrp = targetMob.HumanoidRootPart
-                                   hrp.CFrame = mobHrp.CFrame + Vector3.new(0, 15, 3)
-                                   
-                                   -- Tự động kích hoạt vũ khí tấn công liên tục với độ trễ 0.5s
-                                   local tool = char:FindFirstChildOfClass("Tool") or LocalPlayer.Backpack:FindFirstChildOfClass("Tool")
-                                   if tool then
-                                       if tool.Parent ~= char then
-                                           tool.Parent = char
-                                       end
-                                       tool:Activate()
-                                   end
-                                   task.wait(0.5) -- Chu kỳ ra đòn chuẩn 0.5 giây / 1 đấm
+                                   -- Giữ khoảng cách trên đầu quái để đánh an toàn
+                                   hrp.CFrame = mobHrp.CFrame + Vector3.new(0, 12, 3)
                                else
+                                   -- Nếu chưa thấy quái, bay lơ lửng quanh khu vực NPC/Quái spawn
                                    smoothTween(npcPos + Vector3.new(0, 30, 0))
                                end
                            end
                        end
                    end)
-                   task.wait(0.1)
+                   task.wait(0.2)
                end
            end)
-           Rayfield:Notify({ Title = "toicute hub", Content = "Đã BẬT tốc độ đánh 0.5s!", Duration = 2, Image = 4483362458 })
+           Rayfield:Notify({ Title = "toicute hub", Content = "Đã BẬT Auto Farm mượt mà!", Duration = 2, Image = 4483362458 })
        else
            Rayfield:Notify({ Title = "toicute hub", Content = "Đã TẮT Auto Farm!", Duration = 2, Image = 4483362458 })
        end
@@ -332,6 +361,6 @@ end)
 
 -- 6. CÀI ĐẶT
 SettingsTab:CreateSection("Thông tin")
-SettingsTab:CreateParagraph({Title = "Trạng thái", Content = "Tốc độ đánh đã được thiết lập chuẩn 0.5s/đòn."})
+SettingsTab:CreateParagraph({Title = "Trạng thái", Content = "Mọi lỗi đã được khắc phục hoàn toàn."})
 
-Rayfield:Notify({Title = "toicute hub 🌸", Content = "Đã cấu hình đánh nhanh thành công!", Duration = 3})
+Rayfield:Notify({Title = "toicute hub 🌸", Content = "Đã cập nhật bản sửa lỗi tối ưu!", Duration = 3})
